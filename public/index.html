@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SpikeSight C9: VALORANT tactical scouting and Operator sniper profiler with an SVG tactical map, a seeded economy simulator and a GRID-shaped replay importer.">
+  <title>SpikeSight C9 · VALORANT Tactical Scouting and Operator Profiler</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./js/app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <img class="brand-mark" src="./favicon.svg" alt="" width="42" height="42">
+        <div class="brand-text">
+          <h1>SpikeSight <span class="accent">C9</span></h1>
+          <p class="tagline">VALORANT scouting &amp; Operator sniper profiler</p>
+        </div>
+      </div>
+      <div class="pill-col">
+        <span class="c9-pill">CLOUD9 x JETBRAINS · SKY'S THE LIMIT 2026</span>
+        <span id="data-pill" class="data-pill">MODELLED DATASET</span>
+      </div>
+      <div class="selectors">
+        <label for="team-select">Scouted team
+          <select id="team-select"></select>
+        </label>
+        <label for="our-team-select">Our team
+          <select id="our-team-select"></select>
+        </label>
+      </div>
+      <div class="actions">
+        <button id="load-grid-btn" class="btn btn-ghost" type="button">Load GRID Replay (C9 vs FNC)</button>
+        <button id="dossier-btn" class="btn btn-ghost" type="button">Generate Anti-Strat Dossier</button>
+        <button id="run-sim-btn" class="btn btn-ghost" type="button">Run 1,000-Trial Economy Sim</button>
+        <button id="ask-coach-btn" class="btn btn-cyan" type="button">Ask Tactical AI Coach</button>
+      </div>
+    </header>
+
+    <main class="main-grid">
+      <section class="panel layer-panel" aria-labelledby="layer1-title">
+        <h2 id="layer1-title">Layer 1 · Utility Placement &amp; Ability Analysis</h2>
+
+        <div class="control-group">
+          <span class="group-label">Utility on the map</span>
+          <div class="check-grid">
+            <label class="check" for="toggle-smoke"><input id="toggle-smoke" type="checkbox" checked><span class="swatch swatch-smoke"></span>Smokes</label>
+            <label class="check" for="toggle-flash"><input id="toggle-flash" type="checkbox" checked><span class="swatch swatch-flash"></span>Flashes</label>
+            <label class="check" for="toggle-recon"><input id="toggle-recon" type="checkbox" checked><span class="swatch swatch-recon"></span>Recon/Info</label>
+            <label class="check" for="toggle-molly"><input id="toggle-molly" type="checkbox" checked><span class="swatch swatch-molly"></span>Mollies/Post-Plant</label>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <span class="group-label">Side (Attack vs Defense)</span>
+          <div class="seg seg-3" role="group" aria-label="Side filter">
+            <button class="seg-btn side-btn active" data-side="both" type="button" aria-pressed="true">Both</button>
+            <button class="seg-btn side-btn" data-side="attack" type="button" aria-pressed="false">Attack</button>
+            <button class="seg-btn side-btn" data-side="defense" type="button" aria-pressed="false">Defense</button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <span class="group-label">Round phase</span>
+          <div class="seg seg-2" role="group" aria-label="Round phase filter">
+            <button class="seg-btn phase-btn active" data-phase="all" type="button" aria-pressed="true">All</button>
+            <button class="seg-btn phase-btn" data-phase="default" type="button" aria-pressed="false">0–30s Default</button>
+            <button class="seg-btn phase-btn" data-phase="execute" type="button" aria-pressed="false">30–65s Execute</button>
+            <button class="seg-btn phase-btn" data-phase="postplant" type="button" aria-pressed="false">Post-Plant</button>
+          </div>
+          <p id="events-shown" class="muted"></p>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <span class="kpi-label">Utility Efficiency Score</span>
+            <strong id="kpi-efficiency" class="kpi-value">0</strong>
+            <span id="kpi-efficiency-note" class="kpi-note"></span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Flash Assist Rate</span>
+            <strong id="kpi-flash-assist" class="kpi-value">0%</strong>
+            <span id="kpi-flash-note" class="kpi-note"></span>
+          </div>
+        </div>
+
+        <div class="kpi-block">
+          <span class="kpi-label">Site Bias %</span>
+          <div id="kpi-site-bias" class="bias-rows"></div>
+        </div>
+
+        <div class="kpi-block">
+          <span class="kpi-label">Execute Timing Distribution</span>
+          <svg id="timing-chart" class="chart" viewBox="0 0 320 112" role="img" aria-label="Execute timing distribution"></svg>
+          <p id="timing-note" class="muted"></p>
+        </div>
+
+        <p id="kpi-sample" class="muted sample-line"></p>
+      </section>
+
+      <section class="panel map-panel" aria-label="Tactical map">
+        <div class="map-head">
+          <div class="map-tabs" role="group" aria-label="Map">
+            <button class="map-tab active" data-map="ascent" type="button" aria-pressed="true">Ascent</button>
+            <button class="map-tab" data-map="haven" type="button" aria-pressed="false">Haven</button>
+            <button class="map-tab" data-map="bind" type="button" aria-pressed="false">Bind</button>
+            <button class="map-tab" data-map="lotus" type="button" aria-pressed="false">Lotus</button>
+          </div>
+          <div class="layer-switches" role="group" aria-label="Map layers">
+            <label class="check compact" for="toggle-heat"><input id="toggle-heat" type="checkbox" checked><span class="swatch swatch-heat"></span>Density clusters</label>
+            <label class="check compact" for="toggle-operator"><input id="toggle-operator" type="checkbox" checked><span class="swatch swatch-operator"></span>Operator layer</label>
+            <label class="check compact" for="toggle-counters"><input id="toggle-counters" type="checkbox" checked><span class="swatch swatch-counter"></span>Anti-Op counters</label>
+          </div>
+        </div>
+        <p id="grid-status" class="status-line" role="status"></p>
+        <div class="map-stage">
+          <svg id="tactical-map" class="tactical-map" viewBox="0 0 1000 1000" role="img" aria-label="Top-down tactical map with utility, Operator and counter layers"></svg>
+        </div>
+        <ul class="legend" aria-label="Map legend">
+          <li><span class="swatch swatch-site"></span>Site</li>
+          <li><span class="swatch swatch-plant"></span>Spike plant zone</li>
+          <li><span class="swatch swatch-mid"></span>Mid</li>
+          <li><span class="swatch swatch-spawn-attack"></span>Attacker spawn</li>
+          <li><span class="swatch swatch-spawn-defense"></span>Defender spawn</li>
+          <li><span class="swatch swatch-choke"></span>Choke</li>
+          <li><span class="swatch swatch-smoke"></span>Smoke</li>
+          <li><span class="swatch swatch-flash"></span>Flash cone</li>
+          <li><span class="swatch swatch-recon"></span>Recon ring</li>
+          <li><span class="swatch swatch-molly"></span>Molly</li>
+          <li><span class="swatch swatch-operator"></span>Operator sightline</li>
+          <li><span class="swatch swatch-counter"></span>Anti-Op counter</li>
+        </ul>
+      </section>
+
+      <section class="panel side-panel" aria-label="Scouting panels">
+        <div class="panel-tabs" role="tablist" aria-label="Scouting panels">
+          <button class="panel-tab active" data-panel="operator" type="button" role="tab" aria-selected="true" aria-controls="panel-operator">Operator Profiler</button>
+          <button class="panel-tab" data-panel="economy" type="button" role="tab" aria-selected="false" aria-controls="panel-economy">Economy &amp; Win Probability</button>
+          <button class="panel-tab" data-panel="coach" type="button" role="tab" aria-selected="false" aria-controls="panel-coach">AI Coach</button>
+          <button class="panel-tab" data-panel="dossier" type="button" role="tab" aria-selected="false" aria-controls="panel-dossier">Anti-Strat Dossier</button>
+          <button class="panel-tab" data-panel="grid" type="button" role="tab" aria-selected="false" aria-controls="panel-grid">GRID Live</button>
+        </div>
+
+        <div id="panel-operator" class="tab-panel" role="tabpanel">
+          <h2>Layer 2 · Operator Tendency &amp; Sniper Profiler</h2>
+          <div id="operator-summary" class="stat-row"></div>
+          <h3>Eco-round vs buy-round Operator frequency</h3>
+          <div id="operator-frequency" class="bias-rows"></div>
+          <h3>Hold spots (select a row to highlight it on the map)</h3>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th scope="col">Hold spot</th><th scope="col">Side</th><th scope="col">Watches</th><th scope="col">Holds</th><th scope="col">First-blood pick</th><th scope="col">Re-peek</th><th scope="col">Kills</th></tr>
+              </thead>
+              <tbody id="operator-spots"></tbody>
+            </table>
+          </div>
+          <h3>Anti-Op counter-utility recommendations</h3>
+          <ol id="antiop-list" class="rec-list"></ol>
+        </div>
+
+        <div id="panel-economy" class="tab-panel" role="tabpanel" hidden>
+          <h2>Layer 3 · Economy &amp; Round Win-Probability Markov Engine</h2>
+          <div id="economy-states" class="state-grid"></div>
+          <p id="economy-pistol" class="muted"></p>
+          <h3>Seeded 1,000-trial Monte Carlo (next round onward)</h3>
+          <div class="form-grid">
+            <label for="eco-our-score">Our score<input id="eco-our-score" type="number" min="0" max="18" step="1" value="6"></label>
+            <label for="eco-their-score">Their score<input id="eco-their-score" type="number" min="0" max="18" step="1" value="8"></label>
+            <label for="eco-our-credits">Our team bank<input id="eco-our-credits" type="number" min="0" max="45000" step="500" value="9000"></label>
+            <label for="eco-their-credits">Their team bank<input id="eco-their-credits" type="number" min="0" max="45000" step="500" value="26000"></label>
+            <label for="eco-side">Our side next round
+              <select id="eco-side">
+                <option value="attack">Attack</option>
+                <option value="defense" selected>Defense</option>
+              </select>
+            </label>
+            <label for="eco-seed">Seed<input id="eco-seed" type="number" min="0" max="4294967295" step="1" value="1337"></label>
+            <label for="eco-our-streak">Our loss streak<input id="eco-our-streak" type="number" min="0" max="5" step="1" value="0"></label>
+            <label for="eco-their-streak">Their loss streak<input id="eco-their-streak" type="number" min="0" max="5" step="1" value="0"></label>
+          </div>
+          <p class="muted">Loss streaks 0 and 0 mean not stated: the simulator then takes the team behind on score (at a level score, the team with the smaller bank) to have lost the last round.</p>
+          <h3>Save vs retake situation</h3>
+          <div class="form-grid form-grid-4">
+            <label for="eco-alive">We have alive<input id="eco-alive" type="number" min="0" max="5" step="1" value="3"></label>
+            <label for="eco-enemies">Enemies alive<input id="eco-enemies" type="number" min="0" max="5" step="1" value="4"></label>
+            <label for="eco-time">Seconds left<input id="eco-time" type="number" min="0" max="100" step="1" value="22"></label>
+            <label class="check inline-check" for="eco-planted"><input id="eco-planted" type="checkbox" checked>Spike planted</label>
+          </div>
+          <p class="muted">Uses Our side next round. With the spike planted the defenders need 7 s to defuse, so a short clock hurts a retake and helps a post-plant hold. Before the plant the attackers need 4 s to plant.</p>
+          <div id="sim-results" class="sim-results"></div>
+          <svg id="sim-chart" class="chart" viewBox="0 0 560 172" role="img" aria-label="Final score distribution"></svg>
+        </div>
+
+        <div id="panel-coach" class="tab-panel" role="tabpanel" hidden>
+          <h2>Tactical Anti-Strat Coach</h2>
+          <p class="muted">Answers come from Cloudflare Workers AI grounded on telemetry computed by the Worker. When the model is unavailable, a deterministic coach answers from the same numbers.</p>
+          <label for="coach-input" class="field-label">Question</label>
+          <textarea id="coach-input" rows="3" maxlength="600" placeholder="How do we beat the Fnatic Operator on Ascent defense?"></textarea>
+          <div class="chip-row">
+            <button class="chip coach-chip" type="button" data-question="How do we beat their Operator on this map?">Beat the Operator</button>
+            <button class="chip coach-chip" type="button" data-question="When do they execute and which site do they favour?">Execute timing</button>
+            <button class="chip coach-chip" type="button" data-question="What do they do on pistol rounds?">Pistol rounds</button>
+            <button class="chip coach-chip" type="button" data-question="Should we force buy against their eco tendencies?">Economy</button>
+          </div>
+          <p id="coach-source" class="source-line" role="status">No answer yet.</p>
+          <div id="coach-output" class="coach-output" aria-live="polite">Type a question or pick a prompt, then press Ask Tactical AI Coach.</div>
+        </div>
+
+        <div id="panel-dossier" class="tab-panel" role="tabpanel" hidden>
+          <h2>One-Click Scouting Dossier</h2>
+          <div class="dossier-bar">
+            <button id="copy-dossier-btn" class="btn btn-ghost" type="button">Copy Markdown</button>
+            <p id="dossier-status" class="source-line" role="status">Press Generate Anti-Strat Dossier.</p>
+          </div>
+          <div id="dossier-kpis" class="state-grid"></div>
+          <pre id="dossier-markdown" class="code-box dossier-box"></pre>
+        </div>
+
+        <div id="panel-grid" class="tab-panel" role="tabpanel" hidden>
+          <h2>Live GRID GraphQL (bring your own key)</h2>
+          <p class="muted">The Worker proxy only calls api-op.grid.gg and api.grid.gg on the Central Data and Series State GraphQL paths. Your key travels in the x-api-key header of this one request and is never stored. Without a key the proxy returns the bundled sample and makes no outbound call.</p>
+          <div class="form-grid form-grid-2">
+            <label for="grid-endpoint">Endpoint
+              <select id="grid-endpoint">
+                <option value="central-data">Central Data GraphQL</option>
+                <option value="series-state">Series State GraphQL</option>
+              </select>
+            </label>
+            <label for="grid-api-key">GRID API key (x-api-key)
+              <input id="grid-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Empty: schema preview only">
+            </label>
+          </div>
+          <label for="grid-query" class="field-label">GraphQL query</label>
+          <textarea id="grid-query" rows="3" spellcheck="false"></textarea>
+          <div class="dossier-bar">
+            <button id="grid-query-btn" class="btn btn-ghost" type="button">Run GRID Query</button>
+          </div>
+          <pre id="grid-output" class="code-box grid-box"></pre>
+          <h3>Import a GRID Series State JSON replay</h3>
+          <textarea id="grid-json-input" rows="4" spellcheck="false" placeholder="Paste a seriesState JSON document here"></textarea>
+          <div class="dossier-bar">
+            <button id="grid-import-btn" class="btn btn-ghost" type="button">Import Replay JSON</button>
+            <button id="grid-fill-sample-btn" class="btn btn-ghost" type="button">Fill With Bundled Sample</button>
+            <button id="grid-unload-btn" class="btn btn-ghost" type="button" disabled>Back To Modelled Dataset</button>
+          </div>
+          <p class="muted">A loaded replay stays on screen while you pick either of its teams. Any map tab, a roster that did not play in it, or Back To Modelled Dataset returns to the modelled dataset.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>SpikeSight C9 is an independent open-source tool built for the Cloud9 x JetBrains hackathon. It is not affiliated with or endorsed by Riot Games; VALORANT is a trademark of Riot Games, Inc. Roster datasets are modelled scenario data shaped like GRID Series State, not official match statistics.</p>
+    </footer>
+  </div>
+</body>
+</html>
